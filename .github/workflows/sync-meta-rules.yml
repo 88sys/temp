@@ -1,7 +1,50 @@
-- name: Sync Meta & Release Branches
+name: Sync Meta Rules Dat Branches
+
+on:
+  schedule:
+    # 北京时间 07:30 和 19:30 各自动执行一次（UTC 23:30, 11:30）
+    - cron: "30 11,23 * * *"
+  workflow_dispatch: # 支持手动一键触发
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "**/README.md"
+
+# 开启防碰撞：如果上一次还没跑完，这一次自动取消，避免两个任务同时写入冲突
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # 超过10分钟自动终止，防止浪费 Actions 额度
+
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          # 使用原生 token，请确保仓库 Settings -> Actions -> General -> Workflow permissions 选了 Read and write permissions
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync Meta & Release Branches
         id: sync
         run: |
-          ...
+          echo "=== 准备拉取上游特定分支 ==="
+          UPSTREAM_URL="https://github.com/MetaCubeX/meta-rules-dat.git"
+
+          # 精准拉取 meta 和 release 分支到本地临时引用，不带任何 tags
+          git fetch --no-tags "$UPSTREAM_URL" meta:refs/remotes/upstream-meta
+          git fetch --no-tags "$UPSTREAM_URL" release:refs/remotes/upstream-release
+
+          echo "=== 准备精准推送至本仓库 ==="
+          # 强推到自己的远端对应分支
+          git push --force origin refs/remotes/upstream-meta:refs/heads/meta
+          git push --force origin refs/remotes/upstream-release:refs/heads/release
+
+          echo "✅ 所有指定分支同步成功！"
 
       - name: Generate Summary Report
         if: always()
@@ -9,6 +52,7 @@
           echo "## 🚀 分支同步结果报告" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+          # 通过 steps.sync.outcome 精准捕捉同步步骤的真实结果
           if [ "${{ steps.sync.outcome }}" == "success" ]; then
             echo "- **同步状态**: ✅ 成功" >> $GITHUB_STEP_SUMMARY
           else
