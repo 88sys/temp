@@ -1,44 +1,19 @@
-jobs:
-  sync-branches:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout current repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      # 1. 核心同步步骤，加入 id 以便后续步骤精准追踪状态
-      - name: Sync Meta & Release Branches
+- name: Sync Meta & Release Branches
         id: sync
         run: |
-          echo "=== 准备拉取上游特定分支 ==="
-          UPSTREAM_URL="https://github.com/MetaCubeX/meta-rules-dat.git"
-          
-          git fetch --no-tags "$UPSTREAM_URL" meta:refs/remotes/upstream-meta
-          git fetch --no-tags "$UPSTREAM_URL" release:refs/remotes/upstream-release
-          
-          echo "=== 准备精准推送至本仓库 ==="
-          git push --force origin refs/remotes/upstream-meta:refs/heads/meta
-          git push --force origin refs/remotes/upstream-release:refs/heads/release
-          
-          echo "✅ 所有指定分支同步成功！"
+          ...
 
-      # 2. 报告生成步骤，通过 steps.sync.outcome 判断前步真伪
       - name: Generate Summary Report
         if: always()
         run: |
           echo "## 🚀 分支同步结果报告" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # 完美避开 job.status 的生命周期陷阱，精准捕捉 sync 步骤结果
+
           if [ "${{ steps.sync.outcome }}" == "success" ]; then
             echo "- **同步状态**: ✅ 成功" >> $GITHUB_STEP_SUMMARY
           else
             echo "- **同步状态**: ❌ 失败" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "- **同步分支**: `meta`, `release`" >> $GITHUB_STEP_SUMMARY
+
+          echo "- **同步分支**: \`meta\`, \`release\`" >> $GITHUB_STEP_SUMMARY
           echo "- **执行时间**: $(date -u '+%Y-%m-%d %H:%M:%S' -d '+8 hours') (北京时间)" >> $GITHUB_STEP_SUMMARY
